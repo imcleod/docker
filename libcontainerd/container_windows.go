@@ -142,7 +142,7 @@ func (ctr *container) start() error {
 
 	ctr.client.appendContainer(ctr)
 
-	if err := ctr.client.backend.AttachStreams(ctr.containerID, *iopipe); err != nil {
+	if err := ctr.client.backend.AttachContainerStreams(ctr.containerID, *iopipe); err != nil {
 		// OK to return the error here, as waitExit will handle tear-down in HCS
 		return err
 	}

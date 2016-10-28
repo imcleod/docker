@@ -8,6 +8,7 @@ import (
 	"strconv"
 
 	"github.com/Sirupsen/logrus"
+	"github.com/docker/docker/daemon/exec"
 	"github.com/docker/docker/libcontainerd"
 	"github.com/docker/docker/runconfig"
 )
@@ -101,10 +102,18 @@ func (daemon *Daemon) StateChanged(id string, e libcontainerd.StateInfo) error {
 	return nil
 }
 
-// AttachStreams is called by libcontainerd to connect the stdio.
-func (daemon *Daemon) AttachStreams(id string, iop libcontainerd.IOPipe) error {
+// AttachStreams is called by libcontainerd to connect the stdio to a container.
+func (daemon *Daemon) AttachContainerStreams(id string, iop libcontainerd.IOPipe) error {
 	var s *runconfig.StreamConfig
 	c := daemon.containers.Get(id)
+
+	// Ensure we're only called for the container's main process.  There's
+	// logic to be simplified in this function after this, but we're trying
+	// to keep the patch small.
+	if c == nil {
+		return fmt.Errorf("no such container: %s", id)
+	}
+
 	if c == nil {
 		ec, err := daemon.getExecConfig(id)
 		if err != nil {
@@ -153,4 +162,40 @@ func (daemon *Daemon) AttachStreams(id string, iop libcontainerd.IOPipe) error {
 	}
 
 	return nil
+}
+
+// AttachExecStreams is used as a callback for libcontainerd to connect the
+// stdio streams of an exec process to a dockerd client, using the StreamConfig
+// in the exec.Config rather than the container's main PID's stdio.
+func (daemon *Daemon) AttachExecStreams(config *exec.Config) func(id string, iop libcontainerd.IOPipe) error {
+	return func(id string, iop libcontainerd.IOPipe) error {
+		s := config.StreamConfig
+		copyFunc := func(w io.Writer, r io.Reader) {
+			s.Add(1)
+			go func() {
+				if _, err := io.Copy(w, r); err != nil {
+					logrus.Errorf("%v stream copy error: %v", id, err)
+				}
+				s.Done()
+			}()
+		}
+
+		if iop.Stdout != nil {
+			copyFunc(s.Stdout(), iop.Stdout)
+		}
+		if iop.Stderr != nil {
+			copyFunc(s.Stderr(), iop.Stderr)
+		}
+
+		if stdin := s.Stdin(); stdin != nil {
+			if iop.Stdin != nil {
+				go func() {
+					io.Copy(iop.Stdin, stdin)
+					iop.Stdin.Close()
+				}()
+			}
+		}
+
+		return nil
+	}
 }

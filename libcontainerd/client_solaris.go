@@ -8,7 +8,7 @@ type client struct {
 	// Platform specific properties below here.
 }
 
-func (clnt *client) AddProcess(ctx context.Context, containerID, processFriendlyName string, specp Process) error {
+func (clnt *client) AddProcess(ctx context.Context, containerID, processFriendlyName string, specp Process, attachStdio ProcessStreamAttacher) error {
 	return nil
 }
 
@@ -29,6 +29,10 @@ func (clnt *client) Pause(containerID string) error {
 }
 
 func (clnt *client) Resume(containerID string) error {
+	return nil
+}
+
+func (clnt *client) SignalProcess(containerID string, processFriendlyName string, sig int) error {
 	return nil
 }
 

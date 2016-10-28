@@ -31,15 +31,17 @@ type CommonStateInfo struct { // FIXME: event?
 // Backend defines callbacks that the client of the library needs to implement.
 type Backend interface {
 	StateChanged(containerID string, state StateInfo) error
-	AttachStreams(processFriendlyName string, io IOPipe) error
+	AttachContainerStreams(processFriendlyName string, io IOPipe) error
 }
+
+type ProcessStreamAttacher func(processFriendlyName string, io IOPipe) error
 
 // Client provides access to containerd features.
 type Client interface {
 	Create(containerID string, spec Spec, options ...CreateOption) error
 	Signal(containerID string, sig int) error
 	SignalProcess(containerID string, processFriendlyName string, sig int) error
-	AddProcess(ctx context.Context, containerID, processFriendlyName string, process Process) error
+	AddProcess(ctx context.Context, containerID, processFriendlyName string, process Process, attachStdio ProcessStreamAttacher) error
 	Resize(containerID, processFriendlyName string, width, height int) error
 	Pause(containerID string) error
 	Resume(containerID string) error

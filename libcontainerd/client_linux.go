@@ -30,7 +30,7 @@ type client struct {
 	liveRestore   bool
 }
 
-func (clnt *client) AddProcess(ctx context.Context, containerID, processFriendlyName string, specp Process) error {
+func (clnt *client) AddProcess(ctx context.Context, containerID, processFriendlyName string, specp Process, attachStdio ProcessStreamAttacher) error {
 	clnt.lock(containerID)
 	defer clnt.unlock(containerID)
 	container, err := clnt.getContainer(containerID)
@@ -98,13 +98,9 @@ func (clnt *client) AddProcess(ctx context.Context, containerID, processFriendly
 
 	container.processes[processFriendlyName] = p
 
-	clnt.unlock(containerID)
-
-	if err := clnt.backend.AttachStreams(processFriendlyName, *iopipe); err != nil {
-		clnt.lock(containerID)
+	if err := attachStdio(processFriendlyName, *iopipe); err != nil {
 		return err
 	}
-	clnt.lock(containerID)
 
 	return nil
 }
@@ -422,7 +418,7 @@ func (clnt *client) restore(cont *containerd.Container, lastEvent *containerd.Ev
 		return err
 	}
 
-	if err := clnt.backend.AttachStreams(containerID, *iopipe); err != nil {
+	if err := clnt.backend.AttachContainerStreams(containerID, *iopipe); err != nil {
 		return err
 	}
 

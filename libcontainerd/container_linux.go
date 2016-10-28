@@ -116,7 +116,7 @@ func (ctr *container) start() error {
 	}
 	ctr.startedAt = time.Now()
 
-	if err := ctr.client.backend.AttachStreams(ctr.containerID, *iopipe); err != nil {
+	if err := ctr.client.backend.AttachContainerStreams(ctr.containerID, *iopipe); err != nil {
 		return err
 	}
 	ctr.systemPid = systemPid(resp.Container)
